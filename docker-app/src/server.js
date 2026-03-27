@@ -1,29 +1,38 @@
 const express = require("express");
+const mysql = require("mysql2/promise");
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
-let items = [
-    { id: 1, name: "Docker", description: "Container platform" },
-    { id: 2, name: "Nginx", description: "Web server" },
-    { id: 3, name: "Express", description: "Node.js framework" },
-];
-
-app.get("/api/items", (req, res) => {
-    res.json(items);
+const pool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASS || 'secret',
+    database: process.env.DB_NAME || 'docker_lab',
+    waitForConnections: true,
 });
 
-app.get("/api/health", (req, res) => {
-     res.json({ status: "ok", container: require("os").hostname() });
+app.get("/api/health", async (req, res) => {
+     try {
+        await pool.query('SELECT 1');
+        res.json({ status: "ok", container: require("os").hostname() });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
 });
 
-app.post("/api/items", (req, res) => {
-    const item = { id: items.length + 1, ...req.body };
-    items.push(item);
-    res.status(201).json(item);
+app.get("/api/items", async (req, res) => {
+     const [rows] = await pool.query('SELECT * FROM items');
+     res.json(rows);
 });
 
-app.listen(PORT, () => {
-    console.log(`API running on port ${PORT}`);
+app.post("/api/items", async (req, res) => {
+    const { name, description } = req.body;
+    const [result] = await pool.query(
+        'INSERT INTO items (name, description) VALUES (?, ?)', [name, description]
+    );
+    res.status(201).json({ id: result.insertId, name, description });
 });
+
+app.listen(PORT, () => console.log(`API running on port ${PORT}`));
