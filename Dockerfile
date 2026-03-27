@@ -11,7 +11,7 @@ COPY package.json .
 RUN npm install --production
 
 # Copy the rest of the application
-COPY src/ ./src/
+COPY docker-app/src/ ./src/
 
 # Expose the port the app runs on
 EXPOSE 3000
